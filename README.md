@@ -39,4 +39,7 @@ docker-compose up --build
 
 
 # Пример работы
-[Watch the video](eyes_tracker.mp4)
+[Демо](https://github.com/user-attachments/assets/2c778baf-aac8-420e-a9f4-eff646bbb8e8)
+
+
+
