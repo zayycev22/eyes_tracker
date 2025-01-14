@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Example</title>
+    <style>
+        button {
+            padding: 8px 16px;
+        }
+
+        video {
+            width: 100%;
+        }
+
+        .option {
+            margin-bottom: 8px;
+        }
+
+        #media {
+            max-width: 1280px;
+        }
+    </style>
+</head>
+<body>
+<div class="option">
+    <button id="start" onclick="start()">Start</button>
+    <button id="stop" style="display: none" onclick="stop()">Stop</button>
+</div>
+<div id="media">
+    <h2>Media</h2>
+    <video id="localVideo" autoplay muted playsinline></video>
+    <video id="remoteVideo" autoplay playsinline></video>
+</div>
+<script>
+    var pc = null;
+    const start = async () => {
+        document.getElementById('start').style.display = 'none';
+        document.getElementById('stop').style.display = 'inline-block';
+        pc = new RTCPeerConnection();
+
+        const remoteVideo = document.getElementById("remoteVideo");
+
+
+        // Принимаем трек, отправленный сервером
+        pc.addEventListener('track', (evt) => {
+            if (evt.track.kind === 'video') {
+                remoteVideo.srcObject = evt.streams[0];
+            }
+        });
+        await startWebRTC();
+    }
+    const stop = () => {
+        document.getElementById('start').style.display = 'inline-block';
+        document.getElementById('stop').style.display = 'none';
+        const remoteVideo = document.getElementById("remoteVideo");
+        const localVideo = document.getElementById("localVideo");
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
+
+        setTimeout(() => {
+            pc.close();
+        }, 500);
+    }
+    const startWebRTC = async () => {
+        const localVideo = document.getElementById("localVideo");
+
+
+        // Доступ к камере
+        const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+        localVideo.srcObject = stream;
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        // Создаем PeerConnection
+
+
+        const offer = await pc.createOffer();
+        pc.setLocalDescription(offer).then(() => {
+            // wait for ICE gathering to complete
+            return new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') {
+                    resolve();
+                } else {
+                    const checkState = () => {
+                        if (pc.iceGatheringState === 'complete') {
+                            pc.removeEventListener('icegatheringstatechange', checkState);
+                            resolve();
+                        }
+                    };
+                    pc.addEventListener('icegatheringstatechange', checkState);
+                }
+            })
+        }).then(() => {
+            var offer = pc.localDescription;
+            return fetch('/test_rtc', {
+                body: JSON.stringify({
+                    sdp: offer.sdp,
+                    type: offer.type,
+                }),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                method: 'POST'
+            });
+        }).then((response) => {
+            return response.json();
+        }).then((answer) => {
+            return pc.setRemoteDescription(answer);
+        }).catch((e) => {
+            alert(e);
+        });
+    };
+</script>
+</body>
+</html>
